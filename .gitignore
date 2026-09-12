@@ -1,0 +1,21 @@
+# Pengembangan Lokal (Docker)
+Dockerfile
+docker-compose.yml
+
+# Folder Arsip File PDF
+# Kita kecualikan seluruh isi foldernya agar file PDF dummy tidak ter-push
+arsip/*
+# Tapi kita butuh foldernya tetap ada di server agar fitur upload berjalan
+!arsip/.gitkeep
+
+# File Dummy / Percobaan / Backup
+contoh pdf/
+md.txt
+.tempmediaStorage/
+.user_uploaded/
+scratch/
+*.log
+
+# Konfigurasi Ide/Editor (Opsional)
+.vscode/
+.idea/

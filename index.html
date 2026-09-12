@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rekap TBS Sawit v2</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .hidden-page { display: none !important; }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: #333;
+            color: #fff;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .toast.show {
+            opacity: 1;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printArea, #printArea * {
+                visibility: visible;
+            }
+            #printArea {
+                position: absolute;
+                left: 0;
+                top: 0;
+                margin: 0;
+                padding: 0;
+                width: 100%;
+            }
+            /* Reset parents to avoid spacing issues */
+            body, html, #page-slip, body > .flex, body > .flex > .flex-col {
+                display: block !important;
+                position: static !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                height: auto !important;
+            }
+            @page {
+                size: A4 portrait;
+                margin: 1cm;
+            }
+            .print-hide {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans antialiased min-h-screen flex flex-col md:flex-row">
+
+    <!-- Login Page -->
+    <div id="loginPage" class="flex-grow flex items-center justify-center hidden-page w-full h-screen">
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm">
+            <h1 class="text-2xl font-bold text-center text-green-700 mb-6">Login Sistem TBS</h1>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                <input type="text" id="loginUser" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" id="loginPass" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <button onclick="handleLogin()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-200">
+                Masuk
+            </button>
+        </div>
+    </div>
+
+    <!-- Authenticated Layout -->
+    <div id="authLayout" class="flex-grow flex flex-col md:flex-row hidden-page w-full min-h-screen">
+        
+        <!-- Sidebar -->
+        <aside class="bg-green-800 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-lg">
+            <div class="h-16 flex items-center justify-center border-b border-green-700">
+                <span class="font-bold text-xl tracking-wider">TBS SAWIT V2</span>
+            </div>
+            <nav class="flex-1 px-2 py-4 space-y-2">
+                <button onclick="navTo('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 bg-green-900 rounded-md font-medium text-left">
+                    📊 Dashboard
+                </button>
+                <button onclick="navTo('upload')" id="nav-upload" class="nav-btn w-full flex items-center gap-3 px-4 py-3 hover:bg-green-700 rounded-md font-medium text-left">
+                    📄 Validasi PDF
+                </button>
+                <button onclick="navTo('rekap')" id="nav-rekap" class="nav-btn w-full flex items-center gap-3 px-4 py-3 hover:bg-green-700 rounded-md font-medium text-left">
+                    📁 Rekap Farmer
+                </button>
+                <button onclick="navTo('anggota')" id="nav-anggota" class="nav-btn w-full flex items-center gap-3 px-4 py-3 hover:bg-green-700 rounded-md font-medium text-left">
+                    👥 Master Anggota
+                </button>
+                <button onclick="navTo('slip')" id="nav-slip" class="nav-btn w-full flex items-center gap-3 px-4 py-3 hover:bg-green-700 rounded-md font-medium text-left">
+                    🧾 Slip Pembayaran
+                </button>
+                <button onclick="navTo('settings')" id="nav-settings" class="nav-btn w-full flex items-center gap-3 px-4 py-3 hover:bg-green-700 rounded-md font-medium text-left">
+                    ⚙️ Pengaturan
+                </button>
+            </nav>
+            <div class="p-4 border-t border-green-700">
+                <button onclick="handleLogout()" class="w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-medium transition">Logout</button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col h-screen overflow-hidden">
+            
+            <!-- Page: Dashboard -->
+            <div id="page-dashboard" class="app-page flex-1 overflow-y-auto p-6 hidden-page">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Dashboard Pertumbuhan</h2>
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-700">Total Tonase (Net KG) per Bulan</h3>
+                    <div class="relative h-96 w-full">
+                        <canvas id="growthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page: Upload & Validasi -->
+            <div id="page-upload" class="app-page flex-1 overflow-y-auto p-6 hidden-page">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Upload & Validasi Data</h2>
+                
+                <div class="bg-white rounded-lg shadow-sm p-6 mb-6 border-t-4 border-green-500">
+                    <h3 class="text-lg font-semibold mb-4">Upload Rekap PDF</h3>
+                    <div class="flex flex-col sm:flex-row items-center gap-4">
+                        <input type="file" id="pdfFile" accept="application/pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-gray-200 rounded-md">
+                        <button onclick="processPDF()" class="whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition shadow">
+                            Ekstrak & Upload
+                        </button>
+                    </div>
+                    <div id="uploadStatus" class="mt-3 text-sm text-gray-600"></div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden flex flex-col" style="max-height: 60vh;">
+                    <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                        <h3 class="font-semibold text-gray-700">Antrean Validasi (Unverified)</h3>
+                        <button onclick="loadUploadData()" class="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">Refresh</button>
+                    </div>
+                    <div class="overflow-x-auto overflow-y-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-100 sticky top-0 shadow-sm">
+                                <tr>
+                                    <th class="px-3 py-2 text-left font-medium text-gray-600">WB Ticket</th>
+                                    <th class="px-3 py-2 text-left font-medium text-gray-600">Weighing Date</th>
+                                    <th class="px-3 py-2 text-left font-medium text-gray-600">Vehicle No</th>
+                                    <th class="px-3 py-2 text-left font-medium text-gray-600">Nama PDF</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Bunches</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Net (KG)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Net (RP)</th>
+                                    <th class="px-3 py-2 text-left font-medium text-gray-600 w-64">Verifikasi Manual</th>
+                                </tr>
+                            </thead>
+                            <tbody id="uploadTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- JS Injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page: Rekap Farmer -->
+            <div id="page-rekap" class="app-page flex-1 overflow-y-auto p-6 hidden-page">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Rekapitulasi Petani</h2>
+                
+                <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+                    <div class="flex flex-col sm:flex-row gap-4 items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                        <div class="flex gap-2">
+                            <button onclick="switchRekapTab('akumulasi')" id="tab-akumulasi" class="px-4 py-2 font-medium bg-green-100 text-green-700 rounded-md">Data Akumulasi</button>
+                            <button onclick="switchRekapTab('transaksi')" id="tab-transaksi" class="px-4 py-2 font-medium text-gray-600 hover:bg-gray-100 rounded-md">Data Transaksi (Verified)</button>
+                        </div>
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <input type="month" id="rekapMonth" class="border border-gray-300 rounded-md px-3 py-2" onchange="loadRekapData()">
+                            <input type="text" id="rekapSearch" placeholder="Cari Nama / Tiket..." class="border border-gray-300 rounded-md px-3 py-2 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-green-500" onkeyup="filterRekap()">
+                            <button onclick="loadRekapData()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-r-md">Cari</button>
+                        </div>
+                    </div>
+
+                    <!-- Container Akumulasi -->
+                    <div id="view-akumulasi" class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm border border-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Nama Petani</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Total Transaksi</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Bunches</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Mill (KG)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Deduc (KG)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Incen (KG)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600 font-bold bg-green-50">Net (KG)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Mill (RP)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Deduc (RP)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Incen (RP)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600 font-bold bg-green-50">Net (RP)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="akumulasiTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Container Transaksi -->
+                    <div id="view-transaksi" class="overflow-x-auto hidden-page">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm border border-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-2 text-left font-medium text-gray-600">Nama Valid</th>
+                                    <th class="px-3 py-2 text-left font-medium text-gray-600">WB Ticket</th>
+                                    <th class="px-3 py-2 text-left font-medium text-gray-600">Tgl Timbang</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Bunches</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Mill (KG)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Deduc (KG)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Incen (KG)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600 font-bold bg-green-50">Net (KG)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Mill (RP)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Deduc (RP)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600">Incen (RP)</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-600 font-bold bg-green-50">Net (RP)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transaksiTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page: Master Anggota -->
+            <div id="page-anggota" class="app-page flex-1 overflow-y-auto p-6 hidden-page">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <h2 class="text-2xl font-bold text-gray-800">Master Data Anggota</h2>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <input type="text" id="anggotaSearch" placeholder="Cari nama..." class="border border-gray-300 rounded-md px-3 py-2 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-green-500" onkeyup="filterAnggota()">
+                        <input type="file" id="pdfExtractInput" accept="application/pdf" class="hidden" onchange="processExtractPdf(this)">
+                        <button onclick="document.getElementById('pdfExtractInput').click()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md font-medium shadow whitespace-nowrap">📄 Ekstrak dari PDF</button>
+                        <button onclick="tambahAnggota()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium shadow whitespace-nowrap">+ Tambah Anggota</button>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600 w-16">ID</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Nama Lengkap / Baku</th>
+                                    <th class="px-4 py-3 text-center font-medium text-gray-600 w-32">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="anggotaTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- JS Injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page: Settings -->
+            <div id="page-settings" class="app-page flex-1 overflow-y-auto p-6 hidden-page">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Pengaturan Profil Koperasi</h2>
+                
+                <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">Informasi Umum</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nama Koperasi</label>
+                            <input type="text" id="setNama" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nomor WhatsApp</label>
+                            <input type="text" id="setWA" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-green-500">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Alamat Koperasi</label>
+                            <textarea id="setAlamat" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-green-500" rows="2"></textarea>
+                        </div>
+                    </div>
+                    
+                    <h3 class="text-lg font-semibold text-gray-700 mb-4 mt-6 border-b pb-2">Struktur Pengurus</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nama Ketua</label>
+                            <input type="text" id="setKetua" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nama Sekretaris</label>
+                            <input type="text" id="setSek" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nama Bendahara</label>
+                            <input type="text" id="setBend" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-green-500">
+                        </div>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-700 mb-4 mt-6 border-b pb-2">Pengaturan Potongan (Fee & Pajak)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Jenis Fee Koperasi</label>
+                            <select id="setFeeType" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-green-500">
+                                <option value="percent">Persentase (%)</option>
+                                <option value="per_kg">Rupiah per KG (Rp/KG)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Besaran Fee</label>
+                            <input type="number" id="setFeeAmount" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-green-500" step="0.01">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Pajak PPh (%)</label>
+                            <input type="number" id="setTax" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-green-500" step="0.01">
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end">
+                        <button onclick="saveSettings()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md font-medium">Simpan Profil</button>
+                    </div>
+                </div>
+
+                <div class="bg-red-50 rounded-lg shadow-sm border border-red-200 p-6">
+                    <h3 class="text-lg font-bold text-red-700 mb-2">Danger Zone (Zona Berbahaya)</h3>
+                    <p class="text-red-600 text-sm mb-4">Tindakan ini akan menghapus <b>SELURUH DATA</b> dalam sistem secara permanen, termasuk rekaman transaksi, PDF yang terunggah, serta Master Anggota. Data tidak dapat dipulihkan.</p>
+                    <button onclick="triggerResetData()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-medium shadow-sm">Reset Semua Data</button>
+                </div>
+            </div>
+
+            <!-- Page: Slip Pembayaran -->
+            <div id="page-slip" class="app-page flex-1 overflow-y-auto p-6 hidden-page relative">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 print-hide">
+                    <h2 class="text-2xl font-bold text-gray-800">Cetak Slip Pembayaran</h2>
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <select id="slipStatus" class="border border-gray-300 rounded-md px-3 py-2 bg-white" onchange="loadSlipSummary()">
+                            <option value="Unpaid">Belum Dibayar (Unpaid)</option>
+                            <option value="Paid">Sudah Dibayar (Paid)</option>
+                        </select>
+                        <input type="month" id="slipMonth" class="border border-gray-300 rounded-md px-3 py-2" onchange="loadSlipSummary()">
+                        <button onclick="loadSlipSummary()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">Refresh</button>
+                    </div>
+                </div>
+
+                <div id="slipListContainer" class="bg-white rounded-lg shadow-sm overflow-hidden mb-6 print-hide">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-3 text-left font-medium text-gray-600">Nama Anggota</th>
+                                    <th class="px-3 py-3 text-center font-medium text-gray-600">Jml Transaksi</th>
+                                    <th class="px-3 py-3 text-right font-medium text-gray-600">JJG</th>
+                                    <th class="px-3 py-3 text-right font-medium text-gray-600">Mill (KG)</th>
+                                    <th class="px-3 py-3 text-right font-medium text-gray-600">Deduc (KG)</th>
+                                    <th class="px-3 py-3 text-right font-medium text-gray-600">Incen (KG)</th>
+                                    <th class="px-3 py-3 text-right font-medium text-gray-600 bg-green-50 font-bold">Net (KG)</th>
+                                    <th class="px-3 py-3 text-right font-medium text-gray-600">Mill (Rp)</th>
+                                    <th class="px-3 py-3 text-right font-medium text-gray-600">Deduc (Rp)</th>
+                                    <th class="px-3 py-3 text-right font-medium text-gray-600">Incen (Rp)</th>
+                                    <th class="px-3 py-3 text-right font-medium text-gray-600 bg-green-50 font-bold">Net (Rp)</th>
+                                    <th class="px-3 py-3 text-center font-medium text-gray-600 w-32">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slipSummaryBody" class="bg-white divide-y divide-gray-200">
+                                <!-- JS Injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Printable Area Modal/Overlay -->
+                <div id="printArea" class="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-black max-w-4xl mx-auto hidden-page relative overflow-hidden">
+                    <!-- LUNAS Watermark -->
+                    <div id="printLunasWatermark" class="absolute inset-0 flex items-center justify-center pointer-events-none hidden-page z-0">
+                        <div class="text-[150px] font-black text-red-500 opacity-20 transform -rotate-45 select-none">LUNAS</div>
+                    </div>
+                    <div class="absolute top-4 right-4 flex gap-2 print-hide z-10">
+                        <button onclick="closePrintArea()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded-md text-sm font-medium">X Tutup</button>
+                        <button onclick="window.print()" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded-md text-sm font-medium flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg> Print</button>
+                        <button id="btnMarkPaid" onclick="markSlipAsPaid()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md text-sm font-medium">Tandai Dibayar</button>
+                    </div>
+                    <input type="hidden" id="activeSlipPetaniId">
+
+                    <div class="text-center border-b-2 border-black pb-4 mb-6">
+                        <h1 id="printKoperasi" class="text-2xl font-bold uppercase">NAMA KOPERASI</h1>
+                        <p id="printAlamat" class="text-sm">Alamat Koperasi</p>
+                        <p id="printWA" class="text-sm">WhatsApp: -</p>
+                    </div>
+                    
+                    <div class="flex justify-between items-end mb-6">
+                        <div>
+                            <h2 class="text-xl font-bold underline mb-1">SLIP PEMBAYARAN TBS</h2>
+                            <p class="text-sm">Bulan: <span id="printBulan" class="font-bold"></span></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm">Diberikan kepada:</p>
+                            <p id="printNamaPetani" class="text-lg font-bold"></p>
+                        </div>
+                    </div>
+
+                    <table class="w-full text-sm mb-6 border-collapse border border-gray-400">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="border border-gray-400 px-2 py-2 text-left">No</th>
+                                <th class="border border-gray-400 px-2 py-2 text-left">Tgl Timbang</th>
+                                <th class="border border-gray-400 px-2 py-2 text-left">WB Ticket</th>
+                                <th class="border border-gray-400 px-2 py-2 text-right">Kendaraan</th>
+                                <th class="border border-gray-400 px-2 py-2 text-right">Netto (KG)</th>
+                                <th class="border border-gray-400 px-2 py-2 text-right">Netto (Rp)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="printTableBody">
+                            <!-- JS -->
+                        </tbody>
+                    </table>
+
+                    <div class="flex justify-end mb-8">
+                        <div class="w-72">
+                            <div class="flex justify-between py-1 text-sm border-b border-gray-300">
+                                <span>Total Netto (KG):</span>
+                                <span id="printTotalKG" class="font-bold"></span>
+                            </div>
+                            <div class="flex justify-between py-1 text-sm border-b border-gray-300">
+                                <span>Sub-Total (Rp):</span>
+                                <span id="printSubTotal" class="font-bold"></span>
+                            </div>
+                            <div class="flex justify-between py-1 text-sm text-red-600 border-b border-gray-300">
+                                <span>Potongan Pajak (<span id="printLabelTax"></span>%):</span>
+                                <span id="printValTax"></span>
+                            </div>
+                            <div class="flex justify-between py-1 text-sm text-red-600 border-b border-gray-300">
+                                <span>Fee Koperasi (<span id="printLabelFee"></span>):</span>
+                                <span id="printValFee"></span>
+                            </div>
+                            <div class="flex justify-between py-2 font-bold border-b-2 border-black mt-2">
+                                <span>DITERIMA BERSIH:</span>
+                                <span id="printGrandTotal"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between text-center mt-12 pt-8">
+                        <div>
+                            <p class="mb-16">Penerima,</p>
+                            <p class="font-bold underline" id="printSignPenerima">.......................</p>
+                        </div>
+                        <div>
+                            <p class="mb-16">Pengurus / Kasir,</p>
+                            <p class="font-bold underline" id="printSignPengurus">.......................</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">Notifikasi</div>
+
+    <!-- Modal Form Anggota -->
+    <div id="anggotaModal" class="fixed inset-0 bg-black bg-opacity-50 hidden-page flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h3 id="modalTitle" class="text-xl font-bold mb-4 text-gray-800">Tambah Anggota</h3>
+            <input type="hidden" id="modalIdPetani" value="">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nama Baku / Lengkap</label>
+                <input type="text" id="modalNamaPetani" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Masukkan nama...">
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md font-medium">Batal</button>
+                <button onclick="saveAnggota()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Reset Data -->
+    <div id="resetModal" class="fixed inset-0 bg-black bg-opacity-50 hidden-page flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 border-t-4 border-red-600">
+            <h3 class="text-xl font-bold mb-2 text-red-700">PERINGATAN BAHAYA</h3>
+            <p class="text-gray-600 text-sm mb-4">Ini akan menghapus SELURUH DATA TRANSAKSI, ANGGOTA, & PDF secara permanen!</p>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ketik "hapus data" (tanpa kutip) untuk melanjutkan:</label>
+                <input type="text" id="inputResetConfirm" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="hapus data">
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeResetModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md font-medium">Batal</button>
+                <button onclick="confirmResetData()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium shadow">Eksekusi Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Edit Transaksi -->
+    <div id="editTransaksiModal" class="fixed inset-0 bg-black bg-opacity-50 hidden-page flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 border-t-4 border-blue-500">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Edit Nama Valid</h3>
+            <input type="hidden" id="editTransaksiWbTicket">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Pilih Anggota Baru</label>
+                <div id="editTransaksiDropdownContainer"></div>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeEditTransaksiModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md font-medium">Batal</button>
+                <button onclick="saveEditTransaksi()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium shadow">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Konfirmasi Bayar -->
+    <div id="confirmPaidModal" class="fixed inset-0 bg-black bg-opacity-50 hidden-page flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 border-t-4 border-green-500">
+            <h3 class="text-xl font-bold mb-2 text-green-700">Tandai Sudah Dibayar?</h3>
+            <p class="text-gray-600 text-sm mb-4">Transaksi slip ini akan disahkan. Tagihan yang sudah dibayar tidak akan muncul lagi di daftar cetak slip bulan ini.</p>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeConfirmPaidModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md font-medium">Batal</button>
+                <button onclick="executeMarkAsPaid()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium shadow">Ya, Dibayar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js?v=11"></script>
+</body>
+</html>
