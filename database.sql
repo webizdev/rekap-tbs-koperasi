@@ -1,5 +1,4 @@
-CREATE DATABASE IF NOT EXISTS tbs_sawit;
-USE tbs_sawit;
+-- Script pembuatan tabel (Tanpa CREATE DATABASE untuk cPanel)
 
 -- Tabel Master Petani
 CREATE TABLE IF NOT EXISTS master_petani (
